@@ -1,0 +1,213 @@
+#include "Wire.h"
+#include <MPU6050_light.h>
+#include <Servo.h>
+
+float yaw=0;
+float height=0;
+float a=0;
+MPU6050 mpu(Wire);
+unsigned long timer = 0;
+float duration_us=0;
+float time=0;
+float distance_cm=0;
+
+Servo motor1;
+Servo motor2;
+Servo motor3;
+Servo motor4;
+
+int motorPin1 = 9;
+int motorPin2 = 10;
+int motorPin3 = 11;
+int motorPin4 = 12;
+int trigpin=4;
+int echopin=2;      
+      
+int motorSpeed1 = 0;      
+int motorSpeed2 = 0;      
+int motorSpeed3 = 0;      
+int motorSpeed4 = 0;      
+
+void setup() {
+  Serial.begin(9600);
+  Wire.begin();
+  byte status = mpu.begin();
+  Serial.print(F("MPU6050 status: "));
+  Serial.println(status);
+  while(status!=0){ } // stop everything if could not connect to MPU6050
+  
+  Serial.println(F("Calculating offsets, do not move MPU6050"));
+  delay(1000);
+  // mpu.upsideDownMounting = true; // uncomment this line if the MPU6050 is mounted upside-down
+  mpu.calcOffsets(); // gyro and accelero
+  Serial.println("Done!\n");
+
+  motor1.attach(motorPin1);
+  motor2.attach(motorPin2);
+  motor3.attach(motorPin3);
+  motor4.attach(motorPin4);
+  
+  //set the initial speed of the motors to zero
+  motor1.writeMicroseconds(1000);
+  motor2.writeMicroseconds(1000);
+  motor3.writeMicroseconds(1000);
+  motor4.writeMicroseconds(1000);
+  pinMode(trigpin,OUTPUT);
+  pinMode(echopin,INPUT);
+ }
+void loop() {
+   Serial.println("enter choice\n1. yaw\n2. height\n3. Home position");
+  while(a==0){
+    a=Serial.parseFloat();
+  }
+  if (a==1){
+    getyaw();
+a=0;
+  }
+  else if (a==2){
+    getheight();
+    a=0;
+  }
+else if(a==3){
+  gohome();
+}
+
+else {
+Serial.println("Invalid choice") ;
+a=0; }
+}
+void getyaw(){
+  Serial.println("enter angle: "); 
+  while(yaw==0){   
+       //Prompt User for input
+   //Wait for user input
+  yaw = Serial.parseFloat();              
+  //Read user input and hold it in a variable
+  }
+    Serial.print("angle entered; ");                  
+  Serial.print(yaw);
+
+  if((millis()-timer)>10){ // print data every 10ms
+  while(yaw!=mpu.getAngleZ()){
+    mpu.update();
+    
+   if(yaw>(mpu.getAngleZ())){
+
+      motorSpeed1 += 5;
+      motorSpeed2 -= 5;
+      motorSpeed3 += 5;
+      motorSpeed4 -= 5;
+      while(yaw==int(mpu.getAngleZ())){yaw=0;Serial.println("Done"); return;}
+         }
+   else{
+
+      motorSpeed1 -= 5;
+      motorSpeed2 += 5;
+      motorSpeed3 -= 5;
+      motorSpeed4 += 5;    
+      while(yaw==int(mpu.getAngleZ())){yaw=0;Serial.println("Done"); return;}
+       }
+      // make sure the motor speed is within the range of 1000 to 2000
+    motorSpeed1 = constrain(motorSpeed1, 1000, 2000);
+    motorSpeed2 = constrain(motorSpeed2, 1000, 2000);
+    motorSpeed3 = constrain(motorSpeed3, 1000, 2000);
+    motorSpeed4 = constrain(motorSpeed4, 1000, 2000);
+    
+    // set the speed of each motor
+    motor1.writeMicroseconds(motorSpeed1);
+    motor2.writeMicroseconds(motorSpeed2);
+    motor3.writeMicroseconds(motorSpeed3);
+    motor4.writeMicroseconds(motorSpeed4);
+    
+    // add a delay to prevent the motors from changing speed too quickly
+    delay(10);
+	Serial.println(mpu.getAngleZ());
+	timer = millis();  
+  }
+  }
+}
+void getheight(){
+  mpu.update();
+  while(height==0){   
+  Serial.println("enter height: ");      //Prompt User for input
+  while (Serial.available()==0){} 
+   //Wait for user input
+  height = Serial.parseFloat();              
+  //Read user input and hold it in a variable
+  Serial.print("height entered; ");                  
+  Serial.print(height);
+  }
+  if((millis()-timer)>10){ // print data every 10ms
+  while (height!=heightsensor()){
+  Serial.println(heightsensor());
+   if(height>heightsensor()){
+      motorSpeed1 += 5;
+      motorSpeed2 -= 5;
+      motorSpeed3 += 5;
+      motorSpeed4 -= 5;
+      while(height==heightsensor()){height=0;Serial.println("Done"); return;}
+
+         }
+   else{
+      motorSpeed1 -= 5;
+      motorSpeed2 += 5;
+      motorSpeed3 -= 5;
+      motorSpeed4 += 5;
+           while(height==heightsensor()){height=0;Serial.println("Done"); return;}
+
+       }
+    //   // make sure the motor speed is within the range of 1000 to 2000
+    motorSpeed1 = constrain(motorSpeed1, 1000, 2000);
+    motorSpeed2 = constrain(motorSpeed2, 1000, 2000);
+    motorSpeed3 = constrain(motorSpeed3, 1000, 2000);
+    motorSpeed4 = constrain(motorSpeed4, 1000, 2000);
+    
+    // set the speed of each motor
+    motor1.writeMicroseconds(motorSpeed1);
+    motor2.writeMicroseconds(motorSpeed2);
+    motor3.writeMicroseconds(motorSpeed3);
+    motor4.writeMicroseconds(motorSpeed4);
+    
+    //add a delay to prevent the motors from changing speed too quickly
+    delay(10);
+	timer = millis();  
+  }
+  }
+}
+int heightsensor(){
+ //generate 10-microsecond pulse to TRIG pin
+ digitalWrite(trigpin, HIGH);
+ delayMicroseconds(10);
+ digitalWrite(trigpin, LOW);
+ // measure duration of pulse from ECHO pin
+ duration_us = pulseIn(echopin, HIGH);
+ time=micros(); 
+// calculate the distance
+ distance_cm = 0.01715 * duration_us;
+ return distance_cm;
+}
+void gohome(){
+  while(int(mpu.getAngleZ()!=0))
+  {
+    mpu.update();
+if (mpu.getAngleZ()>0){
+  Serial.println(mpu.getAngleZ());
+  // drone go cw
+      motorSpeed1 -= 5;
+      motorSpeed2 += 5;
+      motorSpeed3 -= 5;
+      motorSpeed4 += 5;
+while(int(mpu.getAngleZ())==0){a=0;Serial.println("done"); return;}
+}
+else{
+  // drone go ccw
+      motorSpeed1 += 5;
+      motorSpeed2 -= 5;
+      motorSpeed3 += 5;
+      motorSpeed4 -= 5;
+  Serial.println(mpu.getAngleZ());
+ while(int(mpu.getAngleZ())==0){a=0;Serial.println("done"); return;}
+ 
+}
+  }
+}
